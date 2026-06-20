@@ -1,0 +1,200 @@
+<Window x:Class="CineVault.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:CineVault.Converters"
+        xmlns:vm="clr-namespace:CineVault.ViewModels"
+        Title="CineVault" Height="820" Width="1360" MinWidth="1000" MinHeight="600"
+        Style="{StaticResource ThemedWindowStyle}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <converters:PathToImageConverter x:Key="PathToImage" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="60*" />
+            <ColumnDefinition Width="40*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============================== LEFT: Library (60%) ============================== -->
+        <Grid Grid.Column="0" Margin="20,20,10,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="🎬" FontSize="26" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock Text="CineVault" FontSize="26" FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <Border Background="#33000000" CornerRadius="20" Padding="10,3" Margin="14,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding FilteredMovies.Count, StringFormat='{}{0} movies'}"
+                                   Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                    </Border>
+                </StackPanel>
+
+                <Button Grid.Column="1" Content="⚙" Style="{StaticResource IconButton}"
+                        VerticalAlignment="Center" Command="{Binding OpenSettingsCommand}" ToolTip="Settings" />
+            </Grid>
+
+            <!-- Search + update library -->
+            <Grid Grid.Row="1" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Style="{StaticResource ThemedTextBox}"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,10,0" />
+                <Button Grid.Column="1" Content="⟳ Update Library" Style="{StaticResource AccentButton}"
+                        Command="{Binding ScanLibraryCommand}" />
+            </Grid>
+
+            <!-- Poster thumbnail grid: 3 columns, scrollable -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ListBox ItemsSource="{Binding FilteredMovies}"
+                         SelectedItem="{Binding SelectedMovie}"
+                         Style="{StaticResource ThumbnailListBox}"
+                         ItemContainerStyle="{StaticResource ThumbnailListBoxItem}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:MovieItemViewModel}">
+                            <Border Width="200" Height="250" CornerRadius="8" ClipToBounds="True">
+                                <Grid>
+                                    <Image Source="{Binding PosterPath, Converter={StaticResource PathToImage}}"
+                                           Stretch="UniformToFill" />
+                                    <Border VerticalAlignment="Bottom" Height="56">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#00000000" Offset="0" />
+                                                <GradientStop Color="#DD000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold"
+                                                   FontSize="13" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Bottom" Margin="8,0,8,6" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </ScrollViewer>
+
+            <!-- Status bar -->
+            <TextBlock Grid.Row="3" Text="{Binding StatusText}"
+                       Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,12,0,0" />
+        </Grid>
+
+        <!-- ============================== RIGHT: Details (40%) ============================== -->
+        <Border Grid.Column="1" Margin="10,20,20,20" CornerRadius="16" ClipToBounds="True">
+            <Grid>
+                <!-- Blurred trending backdrop image -->
+                <Image Source="{Binding SelectedMovie.Movie.BackdropLocalPath, Converter={StaticResource PathToImage}}"
+                       Stretch="UniformToFill">
+                    <Image.Effect>
+                        <BlurEffect Radius="35" />
+                    </Image.Effect>
+                </Image>
+
+                <!-- Dark gradient overlay so text stays readable over the backdrop -->
+                <Border>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#AA1B1320" Offset="0" />
+                            <GradientStop Color="#EE1B1320" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+
+                <!-- Empty state -->
+                <TextBlock Text="Select a movie thumbnail to see its details here"
+                           Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}"
+                           Foreground="{StaticResource TextMutedBrush}" FontSize="16"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center" Margin="40" />
+
+                <!-- Movie details -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="26">
+
+                        <Grid Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Width="110" Height="160" CornerRadius="10" ClipToBounds="True">
+                                <Image Source="{Binding SelectedMovie.Movie.PosterPath, Converter={StaticResource PathToImage}}"
+                                       Stretch="UniformToFill" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding SelectedMovie.Movie.Title}" FontSize="22" FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <TextBlock Text="{Binding SelectedMovie.Movie.ReleaseDate}"
+                                               Foreground="{StaticResource TextMutedBrush}" FontSize="13" />
+                                    <TextBlock Text="  •  ⭐ " Foreground="{StaticResource TextMutedBrush}" FontSize="13" />
+                                    <TextBlock Text="{Binding SelectedMovie.Movie.Rating, StringFormat={}{0:0.0}}"
+                                               Foreground="{StaticResource TextMutedBrush}" FontSize="13" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Button Content="▶  Play" Style="{StaticResource AccentButton}"
+                                            Command="{Binding PlayMovieCommand}" Margin="0,0,10,0" />
+                                    <Button Content="🎞  Trailer" Style="{StaticResource GhostButton}"
+                                            Command="{Binding OpenTrailerCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="Overview" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding SelectedMovie.Movie.Overview}" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextMutedBrush}" FontSize="13" LineHeight="20"
+                                   Margin="0,0,0,20" />
+
+                        <TextBlock Text="Cast" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                        <ItemsControl ItemsSource="{Binding Cast}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:CastMemberViewModel}">
+                                    <StackPanel Width="80" Margin="0,0,12,0" HorizontalAlignment="Center">
+                                        <Border Width="70" Height="70" CornerRadius="35" ClipToBounds="True"
+                                                Background="#332A1330" HorizontalAlignment="Center">
+                                            <Image Source="{Binding ImagePath, Converter={StaticResource PathToImage}}"
+                                                   Stretch="UniformToFill" />
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                   FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                   TextAlignment="Center" Margin="0,6,0,0" />
+                                        <TextBlock Text="{Binding Character}" Foreground="{StaticResource TextMutedBrush}"
+                                                   FontSize="10" TextWrapping="Wrap" TextAlignment="Center" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

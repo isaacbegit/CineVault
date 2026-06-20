@@ -1,0 +1,123 @@
+using CineVault.Models;
+
+namespace CineVault.Services;
+
+/// <summary>
+/// Coordinates a full library scan: walk the disk, enrich each new/changed movie
+/// with TMDb (and optionally AI) metadata, cache images locally, and persist everything.
+/// This is the single entry point the UI talks to for "Update Library".
+/// </summary>
+public class LibraryService
+{
+    private readonly DatabaseService _db;
+    private readonly MovieScannerService _scanner;
+    private readonly ImageCacheService _imageCache;
+
+    public LibraryService(DatabaseService db)
+    {
+        _db = db;
+        _scanner = new MovieScannerService();
+        _imageCache = new ImageCacheService();
+    }
+
+    public List<Movie> LoadFromDatabase() => _db.GetAllMovies();
+
+    public List<CastMember> LoadCast(int movieId) => _db.GetCastForMovie(movieId);
+
+    public async Task<List<Movie>> RescanAndUpdateAsync(AppSettings settings, IProgress<string>? progress = null)
+    {
+        var scanned = _scanner.ScanLibrary(settings.MoviesRootFolder);
+        _db.DeleteMoviesNotIn(scanned.Select(m => m.FolderPath));
+
+        var tmdb = new TmdbService(settings.TmdbApiKey);
+        var ai = AiServiceFactory.Create(settings.AiProvider, settings.AiApiKey, settings.AiModel);
+
+        foreach (var movie in scanned)
+        {
+            progress?.Report($"Processing {movie.Title}...");
+
+            var existing = _db.GetMovieByFolder(movie.FolderPath);
+            var needsEnrichment = existing == null || existing.LastModified != movie.LastModified;
+
+            if (!needsEnrichment && existing != null)
+            {
+                // Folder unchanged since last scan - keep the previously fetched metadata.
+                CopyOnlineMetadata(from: existing, to: movie);
+                _db.UpsertMovie(movie);
+                continue;
+            }
+
+            if (tmdb.IsConfigured)
+            {
+                var details = await tmdb.FindMovieDetailsAsync(movie.Title);
+                if (details != null)
+                {
+                    await EnrichFromTmdbAsync(movie, details, settings, ai);
+                    continue;
+                }
+            }
+
+            // No TMDb match (or no key configured) - fall back to AI summary only, if available.
+            if (settings.AiProvider != "None")
+                movie.Overview = await ai.GetMovieSummaryAsync(movie.Title);
+
+            _db.UpsertMovie(movie);
+        }
+
+        return _db.GetAllMovies();
+    }
+
+    private async Task EnrichFromTmdbAsync(Movie movie, TmdbMovieDetails details, AppSettings settings, IAiService ai)
+    {
+        movie.TmdbId = details.Id.ToString();
+        movie.Overview = details.Overview;
+        movie.Rating = details.VoteAverage;
+        movie.ReleaseDate = details.ReleaseDate;
+        movie.BackdropUrl = TmdbService.BuildImageUrl(details.BackdropPath, "w1280");
+        movie.TrailerUrl = TmdbService.FindTrailerUrl(details);
+
+        if (settings.PreferAiSummary || string.IsNullOrWhiteSpace(movie.Overview))
+        {
+            var aiSummary = await ai.GetMovieSummaryAsync(movie.Title);
+            if (!string.IsNullOrWhiteSpace(aiSummary))
+                movie.Overview = aiSummary;
+        }
+
+        movie.BackdropLocalPath = await _imageCache.DownloadAndCacheAsync(movie.BackdropUrl, $"backdrop_{movie.TmdbId}");
+
+        var movieId = _db.UpsertMovie(movie);
+
+        var castList = new List<CastMember>();
+        if (details.Credits?.Cast != null)
+        {
+            foreach (var c in details.Credits.Cast.OrderBy(c => c.Order).Take(5))
+            {
+                var profileUrl = TmdbService.BuildImageUrl(c.ProfilePath, "w185");
+                var localPath = await _imageCache.DownloadAndCacheAsync(profileUrl, $"cast_{c.Name}_{movieId}");
+
+                castList.Add(new CastMember
+                {
+                    MovieId = movieId,
+                    Name = c.Name,
+                    Character = c.Character,
+                    ProfileImageUrl = profileUrl,
+                    ProfileLocalPath = localPath,
+                    SortOrder = c.Order
+                });
+            }
+        }
+
+        _db.ReplaceCastForMovie(movieId, castList);
+    }
+
+    private static void CopyOnlineMetadata(Movie from, Movie to)
+    {
+        to.TmdbId = from.TmdbId;
+        to.Overview = from.Overview;
+        to.Rating = from.Rating;
+        to.ReleaseDate = from.ReleaseDate;
+        to.BackdropUrl = from.BackdropUrl;
+        to.BackdropLocalPath = from.BackdropLocalPath;
+        to.TrailerUrl = from.TrailerUrl;
+    }
+}

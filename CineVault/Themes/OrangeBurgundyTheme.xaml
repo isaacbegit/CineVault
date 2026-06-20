@@ -1,0 +1,181 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ===================== Palette: Orange + Burgundy ===================== -->
+    <Color x:Key="OrangeLightColor">#FFFFA559</Color>
+    <Color x:Key="OrangePrimaryColor">#FFFF7A30</Color>
+    <Color x:Key="OrangeDeepColor">#FFE85D2A</Color>
+    <Color x:Key="BurgundyPrimaryColor">#FF7B1142</Color>
+    <Color x:Key="BurgundyDeepColor">#FF4A0826</Color>
+    <Color x:Key="CharcoalColor">#FF1B1320</Color>
+    <Color x:Key="TextPrimaryColor">#FFFFF4EC</Color>
+    <Color x:Key="TextMutedColor">#FFD9C2CE</Color>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+
+    <!-- Main diagonal Orange -> Burgundy gradient, used for window backgrounds -->
+    <LinearGradientBrush x:Key="AppBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource OrangePrimaryColor}" Offset="0.0" />
+        <GradientStop Color="{StaticResource OrangeDeepColor}" Offset="0.35" />
+        <GradientStop Color="{StaticResource BurgundyPrimaryColor}" Offset="0.7" />
+        <GradientStop Color="{StaticResource BurgundyDeepColor}" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AccentButtonBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource OrangeLightColor}" Offset="0" />
+        <GradientStop Color="{StaticResource OrangePrimaryColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ===================== Window ===================== -->
+    <Style x:Key="ThemedWindowStyle" TargetType="Window">
+        <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- ===================== Buttons ===================== -->
+    <Style x:Key="AccentButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource AccentButtonBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border" Background="{TemplateBinding Background}"
+                            CornerRadius="8" Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.88" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.7" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="GhostButton" TargetType="Button">
+        <Setter Property="Background" Value="#22FFFFFF" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="#55FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="14,7" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="#33FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="Width" Value="38" />
+        <Setter Property="Height" Value="38" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <!-- ===================== TextBox ===================== -->
+    <Style x:Key="ThemedTextBox" TargetType="TextBox">
+        <Setter Property="Background" Value="#332A1330" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="#55FFA559" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== ComboBox / CheckBox ===================== -->
+    <Style x:Key="ThemedComboBox" TargetType="ComboBox">
+        <Setter Property="Background" Value="#332A1330" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="#55FFA559" />
+        <Setter Property="Padding" Value="8,6" />
+    </Style>
+
+    <Style x:Key="ThemedCheckBox" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- ===================== Thumbnail grid (ListBox used as a movie poster grid) ===================== -->
+    <Style x:Key="ThumbnailListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3" />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ThumbnailListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="Margin" Value="8" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="border" CornerRadius="10" BorderThickness="2"
+                            BorderBrush="Transparent" Background="#22000000">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentButtonBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#33000000" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>
