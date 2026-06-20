@@ -24,48 +24,7 @@ public class LibraryService
 
     public List<CastMember> LoadCast(int movieId) => _db.GetCastForMovie(movieId);
 
-    public async Task<List<Movie>> RescanAndUpdateAsync(AppSettings settings, IProgress<string>? progress = null)
-    {
-        var scanned = _scanner.ScanLibrary(settings.MoviesRootFolder);
-        _db.DeleteMoviesNotIn(scanned.Select(m => m.FolderPath));
-
-        var tmdb = new TmdbService(settings.TmdbApiKey);
-        var ai = AiServiceFactory.Create(settings.AiProvider, settings.AiApiKey, settings.AiModel);
-
-        foreach (var movie in scanned)
-        {
-            progress?.Report($"Processing {movie.Title}...");
-
-            var existing = _db.GetMovieByFolder(movie.FolderPath);
-            var needsEnrichment = existing == null || existing.LastModified != movie.LastModified;
-
-            if (!needsEnrichment && existing != null)
-            {
-                // Folder unchanged since last scan - keep the previously fetched metadata.
-                CopyOnlineMetadata(from: existing, to: movie);
-                _db.UpsertMovie(movie);
-                continue;
-            }
-
-            if (tmdb.IsConfigured)
-            {
-                var details = await tmdb.FindMovieDetailsAsync(movie.Title);
-                if (details != null)
-                {
-                    await EnrichFromTmdbAsync(movie, details, settings, ai);
-                    continue;
-                }
-            }
-
-            // No TMDb match (or no key configured) - fall back to AI summary only, if available.
-            if (settings.AiProvider != "None")
-                movie.Overview = await ai.GetMovieSummaryAsync(movie.Title);
-
-            _db.UpsertMovie(movie);
-        }
-
-        return _db.GetAllMovies();
-    }
+   
 
     private async Task EnrichFromTmdbAsync(Movie movie, TmdbMovieDetails details, AppSettings settings, IAiService ai)
     {
@@ -120,4 +79,62 @@ public class LibraryService
         to.BackdropLocalPath = from.BackdropLocalPath;
         to.TrailerUrl = from.TrailerUrl;
     }
+
+
+    /// <summary>
+    /// Fast, local-only scan: just discovers movies on disk and upserts them.
+    /// No TMDb/AI calls here - that now happens lazily in EnrichMovieAsync
+    /// when the user clicks a thumbnail, so "Update Library" stays quick even for large folders.
+    /// </summary>
+    public async Task<List<Movie>> RescanAndUpdateAsync(AppSettings settings, IProgress<string>? progress = null)
+    {
+        var scanned = _scanner.ScanLibrary(settings.MoviesRootFolder);
+        _db.DeleteMoviesNotIn(scanned.Select(m => m.FolderPath));
+
+        foreach (var movie in scanned)
+        {
+            progress?.Report($"Found {movie.Title}");
+
+            var existing = _db.GetMovieByFolder(movie.FolderPath);
+            if (existing != null)
+                CopyOnlineMetadata(from: existing, to: movie);
+
+            _db.UpsertMovie(movie);
+        }
+
+        await Task.CompletedTask;
+        return _db.GetAllMovies();
+    }
+
+    /// <summary>
+    /// Fetches/refreshes TMDb (+ optional AI) metadata for a single movie.
+    /// Called when the user clicks a thumbnail. Skips the network call entirely if the
+    /// movie was already enriched before, unless forceRefresh is true.
+    /// </summary>
+    public async Task<Movie> EnrichMovieAsync(Movie movie, AppSettings settings, bool forceRefresh = false)
+    {
+        if (!forceRefresh && !string.IsNullOrWhiteSpace(movie.Overview))
+            return movie;
+
+        var tmdb = new TmdbService(settings.TmdbApiKey);
+        var ai = AiServiceFactory.Create(settings.AiProvider, settings.AiApiKey, settings.AiModel);
+
+        if (tmdb.IsConfigured)
+        {
+            var details = await tmdb.FindMovieDetailsAsync(movie.Title);
+            if (details != null)
+            {
+                await EnrichFromTmdbAsync(movie, details, settings, ai);
+                return movie;
+            }
+        }
+
+        if (settings.AiProvider != "None")
+            movie.Overview = await ai.GetMovieSummaryAsync(movie.Title);
+
+        _db.UpsertMovie(movie);
+        return movie;
+    }
+
+
 }

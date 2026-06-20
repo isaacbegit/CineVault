@@ -13,10 +13,6 @@ public class MainViewModel : ViewModelBase
 
     private AppSettings _settings;
 
-    public ObservableCollection<MovieItemViewModel> AllMovies { get; } = new();
-    public ObservableCollection<MovieItemViewModel> FilteredMovies { get; } = new();
-    public ObservableCollection<CastMemberViewModel> Cast { get; } = new();
-
     private MovieItemViewModel? _selectedMovie;
     public MovieItemViewModel? SelectedMovie
     {
@@ -25,14 +21,30 @@ public class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedMovie, value))
             {
-                LoadCastForSelected();
                 OnPropertyChanged(nameof(HasSelection));
+                _ = LoadMovieDetailsAsync(value);
             }
         }
     }
 
     public bool HasSelection => SelectedMovie != null;
 
+    private bool _isLoadingDetails;
+    public bool IsLoadingDetails
+    {
+        get => _isLoadingDetails;
+        set => SetProperty(ref _isLoadingDetails, value);
+    }
+
+
+
+    public ObservableCollection<MovieItemViewModel> AllMovies { get; } = new();
+    public ObservableCollection<MovieItemViewModel> FilteredMovies { get; } = new();
+    public ObservableCollection<CastMemberViewModel> Cast { get; } = new();
+
+  
+
+  
     private string _searchText = string.Empty;
     public string SearchText
     {
@@ -143,13 +155,34 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    private void LoadCastForSelected()
+    private async Task LoadMovieDetailsAsync(MovieItemViewModel? selected)
     {
         Cast.Clear();
-        if (SelectedMovie == null) return;
+        if (selected == null) return;
 
-        foreach (var member in _library.LoadCast(SelectedMovie.Movie.Id))
+        foreach (var member in _library.LoadCast(selected.Movie.Id))
             Cast.Add(new CastMemberViewModel(member));
+
+        ReloadSettings();
+        IsLoadingDetails = true;
+        try
+        {
+            await _library.EnrichMovieAsync(selected.Movie, _settings);
+
+            Cast.Clear();
+            foreach (var member in _library.LoadCast(selected.Movie.Id))
+                Cast.Add(new CastMemberViewModel(member));
+
+            OnPropertyChanged(nameof(SelectedMovie));
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not load AI/TMDb details: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingDetails = false;
+        }
     }
 
     private void PlayMovie(object? _)
@@ -162,6 +195,11 @@ public class MainViewModel : ViewModelBase
     private void OpenTrailer(object? _)
     {
         if (SelectedMovie?.Movie.TrailerUrl == null) return;
-        _player.OpenUrl(SelectedMovie.Movie.TrailerUrl);
+
+        var trailerWindow = new Views.TrailerWindow(SelectedMovie.Movie.Title, SelectedMovie.Movie.TrailerUrl)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        trailerWindow.Show();
     }
 }
