@@ -5,13 +5,21 @@ library — auto-organized into a poster grid with rich, AI/TMDb-powered details
 with photos, trailer link, and a blurred "trending" backdrop.
 
 > **Why "CineVault"?** It's short, brandable, and signals exactly what the app is: a vault for
-> your cinema collection. Other names that fit the same vibe if you'd rather rename the project:
-> **ReelOrbit**, **FlickForge**, **CineEmber**, **MoviePulse**, **CineHaven**.
+> your cinema collection. 
 
 A note on the requested palette: I've implemented it as **Orange → Burgundy**, since "burble"
 isn't a recognized color name — burgundy is the closest deep wine/maroon tone that pairs
 beautifully with orange in a gradient. If you meant a different color, it's a one-line change in
 `Themes/OrangeBurgundyTheme.xaml`.
+
+---
+
+## 📸 Screenshot
+
+![CineVault — main window](CineVault/blob/master/CineVault/Images/main.jpg)
+
+*90-movie library with the poster grid (left) and the details panel (right) — blurred backdrop,
+overview, cast with profile photos, and Play / Trailer action buttons.*
 
 ---
 
