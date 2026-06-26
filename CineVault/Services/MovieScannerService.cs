@@ -1,5 +1,7 @@
 using CineVault.Models;
 using System.IO;
+using static System.Net.WebRequestMethods;
+using File = System.Net.WebRequestMethods.File;
 
 namespace CineVault.Services;
 
@@ -17,7 +19,7 @@ public class MovieScannerService
         { ".srt", ".sub", ".ass", ".vtt", ".ssa" };
 
     private static readonly string[] ImageExtensions =
-        { ".jpg", ".jpeg", ".png", ".webp" };
+        {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp" };
 
     public List<Movie> ScanLibrary(string rootFolder)
     {
@@ -25,9 +27,14 @@ public class MovieScannerService
         if (string.IsNullOrWhiteSpace(rootFolder) || !Directory.Exists(rootFolder))
             return results;
 
-        foreach (var movieFolder in Directory.GetDirectories(rootFolder))
+        var movieFiles = Directory
+    .EnumerateFiles(rootFolder, "*.*", SearchOption.AllDirectories)
+    .Where(file => VideoExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase));
+
+        foreach (var movieFile in movieFiles)
         {
-            var movie = ScanMovieFolder(movieFolder);
+
+            var movie = ScanMovieFolder(movieFile);
             if (movie != null)
                 results.Add(movie);
         }
@@ -35,58 +42,30 @@ public class MovieScannerService
         return results;
     }
 
-    private Movie? ScanMovieFolder(string movieFolder)
+    private Movie? ScanMovieFolder(string movieFile)
     {
-        var allDirs = new List<string> { movieFolder };
-        try
-        {
-            allDirs.AddRange(Directory.GetDirectories(movieFolder, "*", SearchOption.AllDirectories));
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Skip folders we don't have permission to read.
-        }
+        if (string.IsNullOrWhiteSpace(movieFile) || !System.IO.File.Exists(movieFile))
+            return null;
+        var movieFolder = Path.GetDirectoryName(movieFile);
 
-        string? bestDir = null;
-        string? bestPoster = null;
-        var bestTime = DateTime.MinValue;
+        var bestPoster = Directory
+            .EnumerateFiles(movieFolder, "*.*", SearchOption.AllDirectories)
+            .Where(file => ImageExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)).FirstOrDefault();
 
-        // Find the most recently modified folder that contains a "folder.*" poster image.
-        foreach (var dir in allDirs)
-        {
-            string[] files;
-            try { files = Directory.GetFiles(dir); }
-            catch (UnauthorizedAccessException) { continue; }
 
-            var posterFile = files.FirstOrDefault(f =>
-                Path.GetFileNameWithoutExtension(f).Equals("folder", StringComparison.OrdinalIgnoreCase) &&
-                ImageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
+        var subtitleFile = Directory
+          .EnumerateFiles(movieFolder, "*.*", SearchOption.AllDirectories)
+          .Where(file => SubtitleExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)).FirstOrDefault();
 
-            if (posterFile == null) continue;
-
-            var dirTime = Directory.GetLastWriteTime(dir);
-            if (dirTime >= bestTime)
-            {
-                bestTime = dirTime;
-                bestDir = dir;
-                bestPoster = posterFile;
-            }
-        }
-
-        if (bestDir == null) return null; // no folder.jpg anywhere -> skip this movie
-
-        var dirFiles = Directory.GetFiles(bestDir);
-        var videoFile = dirFiles.FirstOrDefault(f => VideoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
-        var subtitleFile = dirFiles.FirstOrDefault(f => SubtitleExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
 
         return new Movie
         {
-            Title = CleanTitle(Path.GetFileName(movieFolder)),
-            FolderPath = movieFolder,
+            Title = CleanTitle(Path.GetFileNameWithoutExtension(movieFile)),
+            FolderPath = Path.GetDirectoryName(movieFile),
             PosterPath = bestPoster,
-            VideoPath = videoFile,
+            VideoPath = movieFile,
             SubtitlePath = subtitleFile,
-            LastModified = bestTime,
+            LastModified = DateTime.Now,
             LastScanned = DateTime.Now
         };
     }
@@ -94,6 +73,7 @@ public class MovieScannerService
     /// <summary>Turns a raw folder name like "The.Matrix.1999.1080p.BluRay.x264" into "The Matrix 1999".</summary>
     public static string CleanTitle(string rawName)
     {
+        if (string.IsNullOrEmpty(rawName)) return string.Empty;
         var name = rawName.Replace('.', ' ').Replace('_', ' ');
 
         name = System.Text.RegularExpressions.Regex.Replace(name, @"[\[\(].*?[\]\)]", " ");

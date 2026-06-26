@@ -7,6 +7,7 @@ namespace CineVault.Views;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private ProgressWindow? _progressWindow;
 
     public MainWindow()
     {
@@ -14,6 +15,8 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
         _viewModel.SettingsRequested += OnSettingsRequested;
+        _viewModel.ScanStarted  += (_, _) => { _progressWindow = new ProgressWindow(_viewModel) { Owner = this }; _progressWindow.Show(); };
+        _viewModel.ScanFinished += (_, _) => { _progressWindow?.Close(); _progressWindow = null; };
 
         Loaded += MainWindow_Loaded;
     }
@@ -24,15 +27,9 @@ public partial class MainWindow : Window
         var settings = db.GetSettings();
 
         if (string.IsNullOrWhiteSpace(settings.MoviesRootFolder))
-        {
-            // First run: ask the user to choose their movies folder via Settings.
             OnSettingsRequested(this, EventArgs.Empty);
-        }
         else if (_viewModel.AllMovies.Count == 0)
-        {
-            // We have a folder configured but an empty database - scan automatically.
             await _viewModel.ScanLibraryAsync();
-        }
     }
 
     private void OnSettingsRequested(object? sender, EventArgs e)
@@ -40,5 +37,22 @@ public partial class MainWindow : Window
         var settingsWindow = new SettingsWindow { Owner = this };
         settingsWindow.ShowDialog();
         _viewModel.ReloadSettings();
+    }
+
+    // ── Custom title-bar controls ─────────────────────────────────────────────
+    private void Minimize_Click(object sender, RoutedEventArgs e)
+        => WindowState = WindowState.Minimized;
+
+    private void Maximize_Click(object sender, RoutedEventArgs e)
+        => WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal : WindowState.Maximized;
+
+    private void CloseWindow_Click(object sender, RoutedEventArgs e) => Close();
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (MaximizeButton != null)
+            MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
     }
 }

@@ -1,6 +1,8 @@
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace CineVault.Services;
 
@@ -9,21 +11,14 @@ namespace CineVault.Services;
 /// overview for most movies; this is only used as a fallback or when the user
 /// explicitly prefers AI-written summaries in Settings.
 /// </summary>
-public interface IAiService
-{
-    Task<string?> GetMovieSummaryAsync(string title);
-}
 
-public class NullAiService : IAiService
-{
-    public Task<string?> GetMovieSummaryAsync(string title) => Task.FromResult<string?>(null);
-}
+
 
 /// <summary>
 /// Google Gemini implementation. Gemini's free tier is generous and is the
 /// recommended option in Settings. Get a key at https://aistudio.google.com/apikey
 /// </summary>
-public class GeminiAiService : IAiService
+public class GeminiAiService
 {
     private readonly HttpClient _http = new();
     private readonly string _apiKey;
@@ -35,52 +30,58 @@ public class GeminiAiService : IAiService
         _model = string.IsNullOrWhiteSpace(model) ? "gemini-2.0-flash" : model;
     }
 
-    public async Task<string?> GetMovieSummaryAsync(string title)
+    public async Task<MovieInfo> GetMovieInfoAsync(string title)
     {
         if (string.IsNullOrWhiteSpace(_apiKey)) return null;
 
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}";
-        var prompt = $"Write a short, spoiler-free 3 sentence summary for the movie titled '{title}'. " +
-                     "Respond with the summary text only, no preamble or markdown.";
+        var apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}";
 
-        var body = new
+
+        // Build request payload with stricter instruction
+        var requestBody = new
         {
             contents = new[]
             {
-                new { parts = new[] { new { text = prompt } } }
+                new {
+                    parts = new[]
+                    {
+                        new { text =
+                            $"Provide JSON with fields: OfficialMovieName, SummaryEnglish, SummaryArabic for the movie '{title}'. " +
+                            "Respond with the summary text only, no preamble or markdown." }
+                    }
+                }
             }
         };
 
         try
         {
-            var response = await _http.PostAsJsonAsync(url, body);
-            if (!response.IsSuccessStatusCode) return null;
+            string jsonRequest = JsonSerializer.Serialize(requestBody);
+            var response = await _http.PostAsync(apiUrl, new StringContent(jsonRequest, Encoding.UTF8, "application/json"));
+            response.EnsureSuccessStatusCode();
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
-
-            var text = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString();
-
-            return text?.Trim();
+            string responseContent = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<MovieInfo>(responseContent);
         }
-        catch
+        catch (Exception ex)
         {
             // Network/parse issues should never crash a library scan - just skip the AI summary.
             return null;
         }
     }
-}
 
-public static class AiServiceFactory
-{
-    public static IAiService Create(string provider, string apiKey, string model) => provider switch
+
+
+
+    public class MovieInfo
     {
-        "Google Gemini" => new GeminiAiService(apiKey, model),
-        _ => new NullAiService()
-    };
+        [JsonPropertyName("OfficialMovieName")]
+        public string OfficialMovieName { get; set; }
+
+        [JsonPropertyName("SummaryEnglish")]
+        public string SummaryEnglish { get; set; }
+
+        [JsonPropertyName("SummaryArabic")]
+        public string SummaryArabic { get; set; }
+    }
+
 }

@@ -12,21 +12,26 @@ public class LibraryService
     private readonly DatabaseService _db;
     private readonly MovieScannerService _scanner;
     private readonly ImageCacheService _imageCache;
+    private GeminiAiService geminiAiService;
+    private AppSettings appSettings;
 
     public LibraryService(DatabaseService db)
     {
         _db = db;
         _scanner = new MovieScannerService();
         _imageCache = new ImageCacheService();
+        appSettings = _db.GetSettings();
+
+        geminiAiService = new GeminiAiService(appSettings.AiApiKey, appSettings.AiModel);
     }
 
     public List<Movie> LoadFromDatabase() => _db.GetAllMovies();
 
     public List<CastMember> LoadCast(int movieId) => _db.GetCastForMovie(movieId);
 
-   
 
-    private async Task EnrichFromTmdbAsync(Movie movie, TmdbMovieDetails details, AppSettings settings, IAiService ai)
+
+    private async Task EnrichFromTmdbAsync(Movie movie, TmdbMovieDetails details, AppSettings settings)
     {
         movie.TmdbId = details.Id.ToString();
         movie.Overview = details.Overview;
@@ -37,9 +42,13 @@ public class LibraryService
 
         if (settings.PreferAiSummary || string.IsNullOrWhiteSpace(movie.Overview))
         {
-            var aiSummary = await ai.GetMovieSummaryAsync(movie.Title);
-            if (!string.IsNullOrWhiteSpace(aiSummary))
-                movie.Overview = aiSummary;
+            var movieInfo = await geminiAiService.GetMovieInfoAsync(movie.Title);
+            if (movieInfo != null)
+            {
+                movie.Overview = movieInfo.SummaryEnglish;
+                movie.Title = movieInfo.OfficialMovieName;
+            }
+
         }
 
         movie.BackdropLocalPath = await _imageCache.DownloadAndCacheAsync(movie.BackdropUrl, $"backdrop_{movie.TmdbId}");
@@ -117,24 +126,38 @@ public class LibraryService
             return movie;
 
         var tmdb = new TmdbService(settings.TmdbApiKey);
-        var ai = AiServiceFactory.Create(settings.AiProvider, settings.AiApiKey, settings.AiModel);
+
 
         if (tmdb.IsConfigured)
         {
             var details = await tmdb.FindMovieDetailsAsync(movie.Title);
             if (details != null)
             {
-                await EnrichFromTmdbAsync(movie, details, settings, ai);
+                await EnrichFromTmdbAsync(movie, details, settings);
                 return movie;
             }
         }
 
         if (settings.AiProvider != "None")
-            movie.Overview = await ai.GetMovieSummaryAsync(movie.Title);
+        {
+            var movieInfo = await geminiAiService.GetMovieInfoAsync(movie.Title);
+            if (movieInfo != null)
+            {
+                movie.Overview = movieInfo.SummaryEnglish;
+                movie.Title = movieInfo.OfficialMovieName;
 
-        _db.UpsertMovie(movie);
-        return movie;
+
+                _db.UpsertMovie(movie);
+                return movie;
+            }
+            else
+                return null;
+
+
+
+        }
+        return null;
+
+
     }
-
-
 }

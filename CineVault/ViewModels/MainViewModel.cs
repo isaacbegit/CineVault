@@ -13,6 +13,10 @@ public class MainViewModel : ViewModelBase
 
     private AppSettings _settings;
 
+    public ObservableCollection<MovieItemViewModel> AllMovies { get; } = new();
+    public ObservableCollection<MovieItemViewModel> FilteredMovies { get; } = new();
+    public ObservableCollection<CastMemberViewModel> Cast { get; } = new();
+
     private MovieItemViewModel? _selectedMovie;
     public MovieItemViewModel? SelectedMovie
     {
@@ -36,15 +40,6 @@ public class MainViewModel : ViewModelBase
         set => SetProperty(ref _isLoadingDetails, value);
     }
 
-
-
-    public ObservableCollection<MovieItemViewModel> AllMovies { get; } = new();
-    public ObservableCollection<MovieItemViewModel> FilteredMovies { get; } = new();
-    public ObservableCollection<CastMemberViewModel> Cast { get; } = new();
-
-  
-
-  
     private string _searchText = string.Empty;
     public string SearchText
     {
@@ -77,6 +72,12 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>Raised when the UI should show the Settings window (e.g. on first run, or gear button).</summary>
     public event EventHandler? SettingsRequested;
+
+    /// <summary>Raised just before the library scan begins — the View shows the progress popup.</summary>
+    public event EventHandler? ScanStarted;
+
+    /// <summary>Raised when the scan finishes (success or error) — the View closes the popup.</summary>
+    public event EventHandler? ScanFinished;
 
     public MainViewModel()
     {
@@ -129,6 +130,7 @@ public class MainViewModel : ViewModelBase
 
         IsBusy = true;
         StatusText = "Scanning library...";
+        ScanStarted?.Invoke(this, EventArgs.Empty);
 
         var progress = new Progress<string>(msg => StatusText = msg);
 
@@ -152,9 +154,15 @@ public class MainViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+            ScanFinished?.Invoke(this, EventArgs.Empty);
         }
     }
 
+    /// <summary>
+    /// Called every time a thumbnail is clicked. Shows any cached cast immediately, then
+    /// calls the AI/TMDb function to fetch Overview, Summary, cast and trailer if this
+    /// movie hasn't been enriched yet (cheap no-op on repeat clicks - see EnrichMovieAsync).
+    /// </summary>
     private async Task LoadMovieDetailsAsync(MovieItemViewModel? selected)
     {
         Cast.Clear();
@@ -173,6 +181,8 @@ public class MainViewModel : ViewModelBase
             foreach (var member in _library.LoadCast(selected.Movie.Id))
                 Cast.Add(new CastMemberViewModel(member));
 
+            // Movie is a plain class (no INotifyPropertyChanged) - re-raising SelectedMovie
+            // makes WPF re-evaluate the whole "SelectedMovie.Movie.*" binding path in the UI.
             OnPropertyChanged(nameof(SelectedMovie));
         }
         catch (Exception ex)
