@@ -5,7 +5,9 @@
         xmlns:vm="clr-namespace:CineVault.ViewModels"
         Title="CineVault" Height="820" Width="1360" MinWidth="1000" MinHeight="600"
         WindowStyle="None" ResizeMode="CanResize"
+      
         Style="{StaticResource ThemedWindowStyle}"
+       
         WindowStartupLocation="CenterScreen">
 
     <WindowChrome.WindowChrome>

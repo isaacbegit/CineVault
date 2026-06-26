@@ -32,6 +32,7 @@
         <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="TextElement.Foreground" Value="{StaticResource TextPrimaryBrush}" />
+       
     </Style>
 
     <!-- ===================== Buttons ===================== -->
