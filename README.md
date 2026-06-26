@@ -16,7 +16,7 @@ beautifully with orange in a gradient. If you meant a different color, it's a on
 
 ## 📸 Screenshot
 
-![CineVault — main window](CineVault/blob/master/CineVault/images/main.png)
+![CineVault — main window](CineVault/images/main.png)
 
 *90-movie library with the poster grid (left) and the details panel (right) — blurred backdrop,
 overview, cast with profile photos, and Play / Trailer action buttons.*
